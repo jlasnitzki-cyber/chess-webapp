@@ -7,7 +7,7 @@ import {
   getLegalMoves,
   makeMove,
   undoMove,
-  setDepth as apiSetDepth
+  setTimeLimit as apiSetTimeLimit
 } from './api.js'
 
 const EMPTY_BOARD = Array.from({ length: 8 }, () => Array(8).fill(0))
@@ -15,6 +15,8 @@ const EMPTY_BOARD = Array.from({ length: 8 }, () => Array(8).fill(0))
 export default function App() {
   const [board, setBoard] = useState(EMPTY_BOARD)
   const [currentTurn, setCurrentTurn] = useState('white')
+  const [playerColor, setPlayerColor] = useState('white')
+  const [engineColor, setEngineColor] = useState('black')
   const [gameOver, setGameOver] = useState(false)
   const [gameOverReason, setGameOverReason] = useState(null)
   const [winner, setWinner] = useState(null)
@@ -22,7 +24,7 @@ export default function App() {
   const [lastMove, setLastMove] = useState(null)
   const [capturedPieces, setCapturedPieces] = useState({ white: [], black: [] })
   const [evalScore, setEvalScore] = useState(0)
-  const [depth, setDepthState] = useState(3)
+  const [timeLimitMs, setTimeLimitMs] = useState(1000)
 
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [legalMoves, setLegalMoves] = useState([])
@@ -33,6 +35,8 @@ export default function App() {
   function applyState(data) {
     setBoard(data.board)
     setCurrentTurn(data.current_turn)
+    setPlayerColor(data.player_color)
+    setEngineColor(data.engine_color)
     setGameOver(data.game_over)
     setGameOverReason(data.game_over_reason)
     setWinner(data.winner)
@@ -40,7 +44,7 @@ export default function App() {
     setLastMove(data.last_move)
     setCapturedPieces(data.captured_pieces)
     setEvalScore(data.eval)
-    setDepthState(data.bot_search_depth)
+    setTimeLimitMs(data.bot_time_limit_ms)
   }
 
   useEffect(() => {
@@ -52,7 +56,7 @@ export default function App() {
 
   function isOwnPiece(piece) {
     if (piece === 0) return false
-    return (piece > 0) === (currentTurn === 'white')
+    return currentTurn === playerColor && (piece > 0) === (playerColor === 'white')
   }
 
   async function selectSquare(row, col) {
@@ -66,7 +70,7 @@ export default function App() {
   }
 
   async function onSquareClick(row, col) {
-    if (thinking || gameOver) return
+    if (thinking || gameOver || currentTurn !== playerColor) return
     setError(null)
 
     const piece = board[row][col]
@@ -110,83 +114,98 @@ export default function App() {
     }
   }
 
-  async function onNewGame() {
+  async function onNewGame(nextPlayerColor = playerColor) {
     setError(null)
     setSelectedSquare(null)
     setLegalMoves([])
+    setThinking(true)
     try {
-      const data = await newGame()
+      const data = await newGame(nextPlayerColor)
       applyState(data)
     } catch (e) {
       setError(e.message)
+    } finally {
+      setThinking(false)
     }
+  }
+
+  async function onPlayerColorChange(nextPlayerColor) {
+    if (nextPlayerColor === playerColor || thinking) return
+    await onNewGame(nextPlayerColor)
   }
 
   async function onUndo() {
     setError(null)
     setSelectedSquare(null)
     setLegalMoves([])
+    setThinking(true)
     try {
       const data = await undoMove()
       applyState(data)
     } catch (e) {
       setError(e.message)
+    } finally {
+      setThinking(false)
     }
   }
 
-  async function onDepthChange(newDepth) {
-  setDepthState(newDepth)
+  async function onTimeLimitChange(newTimeLimitMs) {
+    setTimeLimitMs(newTimeLimitMs)
 
-  try {
-    await apiSetDepth(newDepth)
-  } catch (e) {
-    setError(e.message)
+    try {
+      await apiSetTimeLimit(newTimeLimitMs)
+    } catch (e) {
+      setError(e.message)
+    }
   }
-}
 
-return (
-  <div className="app">
-    <h1 className="title">Chess</h1>
+  return (
+    <div className="app">
+      <h1 className="title">Chess</h1>
 
-    {error && <div className="error-banner">{error}</div>}
+      {error && <div className="error-banner">{error}</div>}
 
-    {!ready ? (
-      <p className="muted">Connecting to backend…</p>
-    ) : (
-      <div className="layout">
-        <div className="board-wrapper">
-          <Board
-            board={board}
-            selectedSquare={selectedSquare}
-            legalMoves={legalMoves}
-            lastMove={lastMove}
-            onSquareClick={onSquareClick}
-            disabled={thinking || gameOver}
+      {!ready ? (
+        <p className="muted">Connecting to backend...</p>
+      ) : (
+        <div className="layout">
+          <div className="board-wrapper">
+            <Board
+              board={board}
+              selectedSquare={selectedSquare}
+              legalMoves={legalMoves}
+              lastMove={lastMove}
+              onSquareClick={onSquareClick}
+              disabled={thinking || gameOver || currentTurn !== playerColor}
+              playerColor={playerColor}
+            />
+
+            {thinking && (
+              <div className="thinking-overlay">
+                <div className="thinking-card">Engine thinking...</div>
+              </div>
+            )}
+          </div>
+
+          <Sidebar
+            currentTurn={currentTurn}
+            playerColor={playerColor}
+            engineColor={engineColor}
+            thinking={thinking}
+            gameOver={gameOver}
+            gameOverReason={gameOverReason}
+            winner={winner}
+            evalScore={evalScore}
+            timeLimitMs={timeLimitMs}
+            onTimeLimitChange={onTimeLimitChange}
+            onNewGame={() => onNewGame(playerColor)}
+            onUndo={onUndo}
+            onPlayerColorChange={onPlayerColorChange}
+            moveLog={moveLog}
+            capturedPieces={capturedPieces}
           />
-
-          {thinking && (
-            <div className="thinking-overlay">
-              <div className="thinking-card">Engine thinking…</div>
-            </div>
-          )}
         </div>
-
-        <Sidebar
-          currentTurn={currentTurn}
-          thinking={thinking}
-          gameOver={gameOver}
-          gameOverReason={gameOverReason}
-          winner={winner}
-          evalScore={evalScore}
-          depth={depth}
-          onDepthChange={onDepthChange}
-          onNewGame={onNewGame}
-          onUndo={onUndo}
-          moveLog={moveLog}
-          capturedPieces={capturedPieces}
-        />
-      </div>
-    )}
-  </div>
-)
+      )}
+    </div>
+  )
 }

@@ -7,16 +7,18 @@ initial_board = copy.deepcopy(config_w.board_start)
 board = copy.deepcopy(initial_board)
 
 board_history = []
+state_history = []
 move_history = []
 piece_history = []
 move_notation_history = []
 
 en_passant_target = None
 current_turn = 1
+player_color = 'white'
 selected_square = None
 move_count = 0
 game_over = False
-bot_search_depth = 3
+bot_time_limit_ms = 1000
 menu_active = True
 running = True
 
@@ -27,6 +29,34 @@ has_moved = set()
 captured_pieces = {'white': [], 'black': []}
 last_move = None
 eval = None
+
+
+def color_to_sign(color):
+    return 1 if color == 'white' else -1
+
+
+def sign_to_color(sign):
+    return 'white' if sign == 1 else 'black'
+
+
+def engine_color():
+    return 'black' if player_color == 'white' else 'white'
+
+
+def current_turn_color():
+    return sign_to_color(current_turn)
+
+
+def snapshot_state():
+    return {
+        'current_turn': current_turn,
+        'en_passant_target': en_passant_target,
+        'captured_pieces': copy.deepcopy(captured_pieces),
+        'has_moved': set(has_moved),
+        'last_move': last_move,
+        'move_count': move_count,
+        'game_over': game_over,
+    }
 
 
 def evaluation(captured_pieces):
@@ -44,9 +74,11 @@ def evaluation(captured_pieces):
 
 
 def undo_move():
-    global board, current_turn, last_move
+    global board, current_turn, en_passant_target, captured_pieces, has_moved
+    global last_move, move_count, game_over
 
-    if board_history:
+    if board_history and state_history:
+        previous_state = state_history.pop()
         if move_history:
             move_history.pop()
         if piece_history:
@@ -54,19 +86,25 @@ def undo_move():
         if move_notation_history:
             move_notation_history.pop()
         board = board_history.pop()
-        current_turn *= -1
-        last_move = move_history[-1] if move_history else None
+        current_turn = previous_state['current_turn']
+        en_passant_target = previous_state['en_passant_target']
+        captured_pieces = previous_state['captured_pieces']
+        has_moved = previous_state['has_moved']
+        last_move = previous_state['last_move']
+        move_count = previous_state['move_count']
+        game_over = previous_state['game_over']
 
 
-def reset_game():
+def reset_game(new_player_color='white'):
     global board, current_turn, selected_square, move_count, running
-    global game_over, en_passant_target, captured_pieces, has_moved
-    global board_history, move_history, piece_history, move_notation_history, last_move
+    global game_over, en_passant_target, captured_pieces, has_moved, player_color
+    global board_history, state_history, move_history, piece_history, move_notation_history, last_move
 
     import engine_w
 
     board = copy.deepcopy(initial_board)
     current_turn = 1
+    player_color = new_player_color
     selected_square = None
     move_count = 0
     game_over = False
@@ -74,6 +112,7 @@ def reset_game():
     captured_pieces = {'white': [], 'black': []}
     has_moved = set()
     board_history = []
+    state_history = []
     move_history = []
     piece_history = []
     move_notation_history = []
@@ -82,7 +121,7 @@ def reset_game():
 
 
 def make_move(start_row, start_col, end_row, end_col):
-    global current_turn, en_passant_target, last_move
+    global current_turn, en_passant_target, last_move, move_count
 
     import moves_w
     import notation_w
@@ -91,6 +130,7 @@ def make_move(start_row, start_col, end_row, end_col):
 
         board_before_move = copy.deepcopy(board)
         board_history.append(board_before_move)
+        state_history.append(snapshot_state())
         move_history.append(((start_row, start_col), (end_row, end_col)))
         piece_history.append(board[start_row][start_col])
 
@@ -130,4 +170,5 @@ def make_move(start_row, start_col, end_row, end_col):
             has_moved.add(f'{color}_rook_{start_col}')
 
         last_move = ((start_row, start_col), (end_row, end_col))
+        move_count += 1
         current_turn *= -1

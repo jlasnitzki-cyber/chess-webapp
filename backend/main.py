@@ -24,6 +24,8 @@ import engine_w
 import moves_w
 import notation_w
 import state_w
+import time
+from typing import Optional
 
 app = FastAPI()
 
@@ -47,13 +49,38 @@ class MoveRequest(BaseModel):
     end_col: int
 
 
-class DepthRequest(BaseModel):
-    depth: int
+class TimeLimitRequest(BaseModel):
+    milliseconds: int
+
+
+class NewGameRequest(BaseModel):
+    player_color: str = "white"
+
+
+def validate_color(color: str):
+    if color not in ("white", "black"):
+        raise HTTPException(status_code=400, detail="Color must be white or black")
+
+
+def is_player_turn():
+    return state_w.current_turn_color() == state_w.player_color
+
+
+def is_engine_turn():
+    return state_w.current_turn_color() == state_w.engine_color()
+
+
+def make_engine_move_if_needed():
+    if state_w.game_over or not is_engine_turn():
+        return None
+
+    engine_w.get_best_move(state_w.engine_color())
+    return check_game_over_for_current_player()
 
 
 def check_game_over_for_current_player():
     """Looks at whoever is about to move and records checkmate/stalemate."""
-    color = "white" if state_w.current_turn == 1 else "black"
+    color = state_w.current_turn_color()
     result = moves_w.check_endgame(state_w.board, color)
 
     if result is None:
@@ -75,7 +102,9 @@ def serialize_state(game_over_info=None):
 
     return {
         "board": state_w.board,
-        "current_turn": "white" if state_w.current_turn == 1 else "black",
+        "current_turn": state_w.current_turn_color(),
+        "player_color": state_w.player_color,
+        "engine_color": state_w.engine_color(),
         "game_over": state_w.game_over,
         "game_over_reason": game_over_info["reason"] if game_over_info else None,
         "winner": winner,
@@ -83,14 +112,18 @@ def serialize_state(game_over_info=None):
         "last_move": state_w.last_move,
         "captured_pieces": state_w.captured_pieces,
         "eval": state_w.evaluation(state_w.captured_pieces),
-        "bot_search_depth": state_w.bot_search_depth,
+        "bot_time_limit_ms": state_w.bot_time_limit_ms,
     }
 
 
 @app.post("/api/new-game")
-def new_game():
-    state_w.reset_game()
-    return serialize_state()
+def new_game(req: Optional[NewGameRequest] = None):
+    player_color = req.player_color if req else "white"
+    validate_color(player_color)
+
+    state_w.reset_game(player_color)
+    game_over_info = make_engine_move_if_needed()
+    return serialize_state(game_over_info)
 
 
 @app.get("/api/state")
@@ -112,10 +145,9 @@ def legal_moves(row: int, col: int):
     if piece == 0:
         return {"moves": []}
 
-    piece_is_white = piece > 0
-    player_to_move_is_white = state_w.current_turn == 1
+    piece_color = "white" if piece > 0 else "black"
 
-    if piece_is_white != player_to_move_is_white:
+    if not is_player_turn() or piece_color != state_w.player_color:
         return {"moves": []}
 
     moves = moves_w.get_legal_moves(state_w.board, row, col)
@@ -127,15 +159,16 @@ def make_move(req: MoveRequest):
     validate_square(req.end_row, req.end_col)
     if state_w.game_over:
         raise HTTPException(status_code=400, detail="Game is already over")
+    if not is_player_turn():
+        raise HTTPException(status_code=400, detail="It is not the player's turn")
 
     piece = state_w.board[req.start_row][req.start_col]
     if piece == 0:
         raise HTTPException(status_code=400, detail="No piece on that square")
 
-    piece_is_white = piece > 0
-    player_to_move_is_white = state_w.current_turn == 1
-    if piece_is_white != player_to_move_is_white:
-        raise HTTPException(status_code=400, detail="It's not that color's turn")
+    piece_color = "white" if piece > 0 else "black"
+    if piece_color != state_w.player_color:
+        raise HTTPException(status_code=400, detail="You cannot move the engine's pieces")
 
     if not moves_w.is_legal_move(
         state_w.board, req.start_row, req.start_col, req.end_row, req.end_col
@@ -149,30 +182,44 @@ def make_move(req: MoveRequest):
     if game_over_info:
         return serialize_state(game_over_info)
 
-    # --- Bot move ---
-    engine_w.get_best_move()
+    # --- Engine move ---
+    start_time = time.perf_counter()
 
+    engine_w.get_best_move(state_w.engine_color())
+
+    elapsed = time.perf_counter() - start_time
     game_over_info = check_game_over_for_current_player()
     return serialize_state(game_over_info)
 
 
 @app.post("/api/undo")
 def undo():
-    # One full round = human move + bot move. Undo both so it's the
-    # human's turn again at the position before their last move.
-    if state_w.current_turn == 1:
-        # It's currently white's turn, meaning black (the bot) just moved.
-        state_w.undo_move()  # undoes bot's move
-    if state_w.move_history:
-        state_w.undo_move()  # undoes human's move
+    player_sign = state_w.color_to_sign(state_w.player_color)
+    player_move_index = None
+
+    for index in range(len(state_w.piece_history) - 1, -1, -1):
+        if state_w.piece_history[index] * player_sign > 0:
+            player_move_index = index
+            break
+
+    if player_move_index is None:
+        return serialize_state()
+
+    while len(state_w.move_history) - 1 > player_move_index:
+        state_w.undo_move()
+
+    state_w.undo_move()
 
     state_w.game_over = False
     return serialize_state()
 
 
-@app.post("/api/depth")
-def set_depth(req: DepthRequest):
-    if req.depth < 1 or req.depth > 5:
-        raise HTTPException(status_code=400, detail="Depth must be between 1 and 5")
-    state_w.bot_search_depth = req.depth
-    return {"bot_search_depth": state_w.bot_search_depth}
+@app.post("/api/time-limit")
+def set_time_limit(req: TimeLimitRequest):
+    if req.milliseconds < 100 or req.milliseconds > 10000:
+        raise HTTPException(
+            status_code=400,
+            detail="Time limit must be between 100ms and 10000ms",
+        )
+    state_w.bot_time_limit_ms = req.milliseconds
+    return {"bot_time_limit_ms": state_w.bot_time_limit_ms}

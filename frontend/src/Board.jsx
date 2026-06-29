@@ -4,7 +4,22 @@ function squareKey(row, col) {
   return `${row}-${col}`
 }
 
-export default function Board({ board, selectedSquare, legalMoves, lastMove, onSquareClick, disabled }) {
+function displayToBoard(row, col, playerColor) {
+  if (playerColor === 'black') {
+    return [7 - row, 7 - col]
+  }
+  return [row, col]
+}
+
+export default function Board({
+  board,
+  selectedSquare,
+  legalMoves,
+  lastMove,
+  onSquareClick,
+  disabled,
+  playerColor
+}) {
   const legalSet = new Set((legalMoves || []).map(([r, c]) => squareKey(r, c)))
   const lastMoveSet = new Set(
     lastMove ? lastMove.map(([r, c]) => squareKey(r, c)) : []
@@ -12,8 +27,10 @@ export default function Board({ board, selectedSquare, legalMoves, lastMove, onS
 
   return (
     <div className={`board ${disabled ? 'board-disabled' : ''}`}>
-      {board.map((rowValues, row) =>
-        rowValues.map((piece, col) => {
+      {Array.from({ length: 8 }, (_, displayRow) =>
+        Array.from({ length: 8 }, (_, displayCol) => {
+          const [row, col] = displayToBoard(displayRow, displayCol, playerColor)
+          const piece = board[row][col]
           const isLight = (row + col) % 2 === 0
           const isSelected =
             selectedSquare && selectedSquare[0] === row && selectedSquare[1] === col

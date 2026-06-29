@@ -26,8 +26,8 @@ npm install
 npm run dev
 ```
 
-This opens the app at `http://localhost:5173`. You play white; the
-engine plays black and moves automatically after your move.
+This opens the app at `http://localhost:5173`. You can choose white or
+black; the engine plays the other side and moves automatically.
 
 ## How it works
 
@@ -45,7 +45,7 @@ engine plays black and moves automatically after your move.
   `notation_w.py`/`moves_w.py` behavior). Adding an underpromotion
   choice would mean adding a `promotion` field to the `/api/move`
   request and threading it through `apply_special_moves`.
-- **Undo** takes back a full round (your move + the engine's reply) so
+- **Undo** takes back your last move plus any engine reply after it, so
   it's always your turn afterward.
-- **Engine depth** is adjustable from the sidebar (1-5). Higher depth
+- **Engine move time** is adjustable from the sidebar. More time usually
   means a stronger but slower bot.

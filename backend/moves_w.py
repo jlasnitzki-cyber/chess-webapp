@@ -208,23 +208,65 @@ def get_moves(board, row, col):
     return []
 
 
-def is_square_attacked(board, row, col):
+def is_square_attacked(board, row, col, attacker_color=None):
     piece = board[row][col]
 
-    if piece == 0:
-        return False
+    if attacker_color is None:
+        if piece == 0:
+            return False
+        attacker_sign = -1 if piece > 0 else 1
+    else:
+        attacker_sign = 1 if attacker_color == 'white' else -1
 
-    enemy_sign = -1 if piece > 0 else 1
+    pawn_direction = -1 if attacker_sign > 0 else 1
+    for dc in (-1, 1):
+        pawn_row = row - pawn_direction
+        pawn_col = col - dc
+        if in_bounds(pawn_row, pawn_col) and board[pawn_row][pawn_col] == 6 * attacker_sign:
+            return True
 
-    for r in range(8):
-        for c in range(8):
-            target_piece = board[r][c]
+    knight_offsets = [
+        (2, 1), (2, -1), (-2, 1), (-2, -1),
+        (1, 2), (1, -2), (-1, 2), (-1, -2)
+    ]
+    for dr, dc in knight_offsets:
+        attack_row = row + dr
+        attack_col = col + dc
+        if in_bounds(attack_row, attack_col) and board[attack_row][attack_col] == 4 * attacker_sign:
+            return True
 
-            if target_piece * enemy_sign > 0:
-                moves = get_moves(board, r, c)
-
-                if (row, col) in moves:
+    bishop_directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+    for dr, dc in bishop_directions:
+        attack_row = row + dr
+        attack_col = col + dc
+        while in_bounds(attack_row, attack_col):
+            attacker = board[attack_row][attack_col]
+            if attacker != 0:
+                if attacker in (3 * attacker_sign, 2 * attacker_sign):
                     return True
+                break
+            attack_row += dr
+            attack_col += dc
+
+    rook_directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    for dr, dc in rook_directions:
+        attack_row = row + dr
+        attack_col = col + dc
+        while in_bounds(attack_row, attack_col):
+            attacker = board[attack_row][attack_col]
+            if attacker != 0:
+                if attacker in (5 * attacker_sign, 2 * attacker_sign):
+                    return True
+                break
+            attack_row += dr
+            attack_col += dc
+
+    king_directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+    for dr, dc in king_directions:
+        attack_row = row + dr
+        attack_col = col + dc
+        if in_bounds(attack_row, attack_col) and board[attack_row][attack_col] == attacker_sign:
+            return True
 
     return False
 
@@ -380,10 +422,10 @@ def check_castling(board, color, king_side):
         if board[row][col] != 0:
             return False
 
+    opponent_color = 'black' if color == 'white' else 'white'
     dest_col = 6 if king_side else 2
     for col in range(king_col, dest_col + step, step):
-        temp_board = simulate_move(board, row, king_col, row, col)
-        if is_in_check(temp_board, color):
+        if is_square_attacked(board, row, col, opponent_color):
             return False
 
     return True

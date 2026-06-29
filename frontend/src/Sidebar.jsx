@@ -42,15 +42,18 @@ function CapturedRow({ label, pieces }) {
 
 export default function Sidebar({
   currentTurn,
+  playerColor,
+  engineColor,
   thinking,
   gameOver,
   gameOverReason,
   winner,
   evalScore,
-  depth,
-  onDepthChange,
+  timeLimitMs,
+  onTimeLimitChange,
   onNewGame,
   onUndo,
+  onPlayerColorChange,
   moveLog,
   capturedPieces
 }) {
@@ -58,10 +61,10 @@ export default function Sidebar({
   if (gameOver) {
     status =
       gameOverReason === 'checkmate'
-        ? `Checkmate — ${winner} wins`
-        : 'Stalemate — draw'
+        ? `Checkmate - ${winner} wins`
+        : 'Stalemate - draw'
   } else if (thinking) {
-    status = 'Engine is thinking…'
+    status = 'Engine is thinking...'
   } else {
     status = `${currentTurn === 'white' ? 'White' : 'Black'} to move`
   }
@@ -71,25 +74,47 @@ export default function Sidebar({
       <div className="panel status-panel">
         <h2>Status</h2>
         <p className={gameOver ? 'status-over' : 'status-line'}>{status}</p>
+        <p className="muted">
+          You: {playerColor} | Engine: {engineColor}
+        </p>
         <p className="muted">Eval: {evalScore > 0 ? `+${evalScore}` : evalScore}</p>
       </div>
 
       <div className="panel controls-panel">
         <h2>Controls</h2>
-        <button className="btn" onClick={onNewGame}>
+        <div className="color-picker" aria-label="Choose player color">
+          <button
+            className={`segmented-btn ${playerColor === 'white' ? 'active' : ''}`}
+            onClick={() => onPlayerColorChange('white')}
+            disabled={thinking}
+            type="button"
+          >
+            White
+          </button>
+          <button
+            className={`segmented-btn ${playerColor === 'black' ? 'active' : ''}`}
+            onClick={() => onPlayerColorChange('black')}
+            disabled={thinking}
+            type="button"
+          >
+            Black
+          </button>
+        </div>
+        <button className="btn" onClick={onNewGame} disabled={thinking}>
           New game
         </button>
         <button className="btn" onClick={onUndo} disabled={thinking}>
           Undo
         </button>
-        <label className="depth-label">
-          Engine depth: {depth}
+        <label className="time-label">
+          Engine move time: {(timeLimitMs / 1000).toFixed(1)}s
           <input
             type="range"
-            min="1"
-            max="5"
-            value={depth}
-            onChange={(e) => onDepthChange(Number(e.target.value))}
+            min="100"
+            max="5000"
+            step="100"
+            value={timeLimitMs}
+            onChange={(e) => onTimeLimitChange(Number(e.target.value))}
             disabled={thinking}
           />
         </label>

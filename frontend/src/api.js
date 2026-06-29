@@ -17,8 +17,11 @@ async function request(path, options = {}) {
 
   return res.json()
 }
-export function newGame() {
-  return request('/api/new-game', { method: 'POST' })
+export function newGame(playerColor = 'white') {
+  return request('/api/new-game', {
+    method: 'POST',
+    body: JSON.stringify({ player_color: playerColor })
+  })
 }
 
 export function getState() {
@@ -45,9 +48,9 @@ export function undoMove() {
   return request('/api/undo', { method: 'POST' })
 }
 
-export function setDepth(depth) {
-  return request('/api/depth', {
+export function setTimeLimit(milliseconds) {
+  return request('/api/time-limit', {
     method: 'POST',
-    body: JSON.stringify({ depth })
+    body: JSON.stringify({ milliseconds })
   })
 }
