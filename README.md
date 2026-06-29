@@ -29,6 +29,16 @@ npm run dev
 This opens the app at `http://localhost:5173`. You can choose white or
 black; the engine plays the other side and moves automatically.
 
+## Deploy to Vercel
+
+Deploy from the repository root, not from the `frontend/` folder. The root
+`vercel.json` builds `frontend/`, serves the built UI, and routes `/api/*`
+to the FastAPI app through `api/index.py`.
+
+For local development, the frontend calls `http://127.0.0.1:8000`. In a
+production Vercel build, it calls the same Vercel origin, so `/api/state`
+and the other API routes are served by the deployed Python function.
+
 ## How it works
 
 - **One shared game.** `state_w.py` keeps the game in module-level
