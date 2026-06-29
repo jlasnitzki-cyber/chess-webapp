@@ -135,24 +135,26 @@ export default function App() {
   }
 
   async function onDepthChange(newDepth) {
-    setDepthState(newDepth)
-    try {
-      await apiSetDepth(newDepth)
-    } catch (e) {
-      setError(e.message)
-    }
+  setDepthState(newDepth)
+
+  try {
+    await apiSetDepth(newDepth)
+  } catch (e) {
+    setError(e.message)
   }
+}
 
-  return (
-    <div className="app">
-      <h1 className="title">Chess</h1>
+return (
+  <div className="app">
+    <h1 className="title">Chess</h1>
 
-      {error && <div className="error-banner">{error}</div>}
+    {error && <div className="error-banner">{error}</div>}
 
-      {!ready ? (
-        <p className="muted">Connecting to backend…</p>
-      ) : (
-        <div className="layout">
+    {!ready ? (
+      <p className="muted">Connecting to backend…</p>
+    ) : (
+      <div className="layout">
+        <div className="board-wrapper">
           <Board
             board={board}
             selectedSquare={selectedSquare}
@@ -161,39 +163,30 @@ export default function App() {
             onSquareClick={onSquareClick}
             disabled={thinking || gameOver}
           />
-          <Sidebar
-            currentTurn={currentTurn}
-            thinking={thinking}
-            gameOver={gameOver}
-            gameOverReason={gameOverReason}
-            winner={winner}
-            evalScore={evalScore}
-            depth={depth}
-            onDepthChange={onDepthChange}
-            onNewGame={onNewGame}
-            onUndo={onUndo}
-            moveLog={moveLog}
-            capturedPieces={capturedPieces}
-          />
+
+          {thinking && (
+            <div className="thinking-overlay">
+              <div className="thinking-card">Engine thinking…</div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  )
+
+        <Sidebar
+          currentTurn={currentTurn}
+          thinking={thinking}
+          gameOver={gameOver}
+          gameOverReason={gameOverReason}
+          winner={winner}
+          evalScore={evalScore}
+          depth={depth}
+          onDepthChange={onDepthChange}
+          onNewGame={onNewGame}
+          onUndo={onUndo}
+          moveLog={moveLog}
+          capturedPieces={capturedPieces}
+        />
+      </div>
+    )}
+  </div>
+)
 }
-
-<div className="board-wrapper">
-  <Board
-    board={board}
-    selectedSquare={selectedSquare}
-    legalMoves={legalMoves}
-    lastMove={lastMove}
-    onSquareClick={onSquareClick}
-    disabled={thinking || gameOver}
-  />
-
-  {thinking && (
-    <div className="thinking-overlay">
-      <div className="thinking-card">Engine thinking…</div>
-    </div>
-  )}
-</div>
