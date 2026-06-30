@@ -24,7 +24,7 @@ body {
 }
 
 .app {
-  max-width: 980px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 32px 24px 64px;
 }
@@ -40,7 +40,7 @@ body {
 
 .layout {
   display: flex;
-  gap: 28px;
+  gap: 20px;
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -62,6 +62,54 @@ body {
 .board-wrapper {
   position: relative;
   flex-shrink: 0;
+}
+
+.play-area {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex: 0 1 auto;
+}
+
+.board-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 646px;
+  max-width: 100%;
+}
+
+.captured-shelf {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.captured-strip {
+  min-height: 58px;
+  background: #23211f;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.captured-strip-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.captured-strip-pieces {
+  min-height: 24px;
+  margin-top: 5px;
+  color: #ece7df;
+  font-size: 20px;
+  line-height: 1.1;
+  letter-spacing: 1px;
 }
 
 .thinking-overlay {
@@ -169,7 +217,7 @@ body {
   flex-direction: column;
   gap: 14px;
   min-width: 260px;
-  flex: 1;
+  flex: 1 1 260px;
 }
 
 .panel {
@@ -212,12 +260,17 @@ body {
   gap: 10px;
 }
 
-.color-picker {
+.color-picker,
+.limit-picker {
   display: grid;
   grid-template-columns: 1fr 1fr;
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   overflow: hidden;
+}
+
+.limit-picker {
+  margin-top: 6px;
 }
 
 .segmented-btn {
@@ -278,20 +331,24 @@ body {
   width: 100%;
 }
 
-.captured-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
+.inactive-setting {
+  opacity: 0.52;
 }
 
-.captured-glyphs {
-  font-size: 18px;
-  letter-spacing: 1px;
+.captured-empty {
+  color: var(--text-dim);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.move-panel {
+  width: 220px;
+  flex: 0 0 220px;
+  align-self: stretch;
 }
 
 .move-history {
-  max-height: 220px;
+  max-height: 690px;
   overflow-y: auto;
   font-size: 14px;
 }
@@ -308,6 +365,26 @@ body {
 }
 
 @media (max-width: 720px) {
+  .app {
+    padding: 24px 16px 48px;
+  }
+
+  .play-area {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .board-column,
+  .board-wrapper,
+  .move-panel,
+  .sidebar {
+    width: 100%;
+  }
+
+  .captured-shelf {
+    grid-template-columns: 1fr;
+  }
+
   .board {
     grid-template-columns: repeat(8, 11vw);
     grid-template-rows: repeat(8, 11vw);
@@ -315,5 +392,9 @@ body {
 
   .piece {
     font-size: 7vw;
+  }
+
+  .move-history {
+    max-height: 180px;
   }
 }

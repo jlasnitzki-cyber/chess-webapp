@@ -1,45 +1,3 @@
-import { pieceGlyph } from './pieces.js'
-
-function MoveHistory({ moveLog }) {
-  const rows = []
-  for (let i = 0; i < moveLog.length; i += 2) {
-    rows.push({
-      number: i / 2 + 1,
-      white: moveLog[i],
-      black: moveLog[i + 1]
-    })
-  }
-
-  return (
-    <div className="panel">
-      <h2>Moves</h2>
-      <div className="move-history">
-        {rows.length === 0 && <p className="muted">No moves yet</p>}
-        {rows.map((r) => (
-          <div className="move-row" key={r.number}>
-            <span className="move-number">{r.number}.</span>
-            <span className="move-white">{r.white}</span>
-            <span className="move-black">{r.black || ''}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function CapturedRow({ label, pieces }) {
-  return (
-    <div className="captured-row">
-      <span className="muted">{label}</span>
-      <span className="captured-glyphs">
-        {pieces.map((p, i) => (
-          <span key={i}>{pieceGlyph(p)}</span>
-        ))}
-      </span>
-    </div>
-  )
-}
-
 export default function Sidebar({
   currentTurn,
   playerColor,
@@ -50,12 +8,14 @@ export default function Sidebar({
   winner,
   evalScore,
   timeLimitMs,
+  botLimitMode,
+  depthLimit,
   onTimeLimitChange,
+  onDepthLimitChange,
+  onBotLimitModeChange,
   onNewGame,
   onUndo,
-  onPlayerColorChange,
-  moveLog,
-  capturedPieces
+  onPlayerColorChange
 }) {
   let status
   if (gameOver) {
@@ -106,27 +66,55 @@ export default function Sidebar({
         <button className="btn" onClick={onUndo} disabled={thinking}>
           Undo
         </button>
-        <label className="time-label">
-          Engine move time: {(timeLimitMs / 1000).toFixed(1)}s
+        <div className="time-label">
+          Engine limit
+          <div className="limit-picker" aria-label="Choose engine limit mode">
+            <button
+              className={`segmented-btn ${botLimitMode === 'time' ? 'active' : ''}`}
+              onClick={() => onBotLimitModeChange('time')}
+              disabled={thinking}
+              type="button"
+            >
+              Time
+            </button>
+            <button
+              className={`segmented-btn ${botLimitMode === 'depth' ? 'active' : ''}`}
+              onClick={() => onBotLimitModeChange('depth')}
+              disabled={thinking}
+              type="button"
+            >
+              Depth
+            </button>
+          </div>
+        </div>
+
+        <label className={`time-label ${botLimitMode !== 'time' ? 'inactive-setting' : ''}`}>
+          Move time: {(timeLimitMs / 1000).toFixed(1)}s
           <input
             type="range"
             min="100"
-            max="5000"
+            max="10000"
             step="100"
             value={timeLimitMs}
             onChange={(e) => onTimeLimitChange(Number(e.target.value))}
-            disabled={thinking}
+            disabled={thinking || botLimitMode !== 'time'}
+          />
+        </label>
+
+        <label className={`time-label ${botLimitMode !== 'depth' ? 'inactive-setting' : ''}`}>
+          Search depth: {depthLimit}
+          <input
+            type="range"
+            min="1"
+            max="6"
+            step="1"
+            value={depthLimit}
+            onChange={(e) => onDepthLimitChange(Number(e.target.value))}
+            disabled={thinking || botLimitMode !== 'depth'}
           />
         </label>
       </div>
 
-      <div className="panel">
-        <h2>Captured</h2>
-        <CapturedRow label="By white" pieces={capturedPieces.white} />
-        <CapturedRow label="By black" pieces={capturedPieces.black} />
-      </div>
-
-      <MoveHistory moveLog={moveLog} />
     </div>
   )
 }

@@ -1,16 +1,78 @@
 import { useEffect, useState } from 'react'
 import Board from './Board.jsx'
 import Sidebar from './Sidebar.jsx'
+import { pieceGlyph } from './pieces.js'
 import {
   getState,
   newGame,
   getLegalMoves,
   makeMove,
   undoMove,
-  setTimeLimit as apiSetTimeLimit
+  setBotLimit
 } from './api.js'
 
 const EMPTY_BOARD = Array.from({ length: 8 }, () => Array(8).fill(0))
+const PIECE_VALUES = { 1: 0, 2: 9, 3: 3, 4: 3, 5: 5, 6: 1 }
+
+function materialTotal(pieces) {
+  return pieces.reduce((sum, piece) => sum + PIECE_VALUES[Math.abs(piece)], 0)
+}
+
+function CapturedStrip({ label, pieces }) {
+  return (
+    <div className="captured-strip">
+      <div className="captured-strip-heading">
+        <span>{label}</span>
+        <span>+{materialTotal(pieces)}</span>
+      </div>
+      <div className="captured-strip-pieces">
+        {pieces.length === 0 ? (
+          <span className="captured-empty">None</span>
+        ) : (
+          pieces.map((piece, index) => (
+            <span key={`${piece}-${index}`}>{pieceGlyph(piece)}</span>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CapturedShelf({ capturedPieces }) {
+  return (
+    <div className="captured-shelf" aria-label="Captured pieces">
+      <CapturedStrip label="White captured" pieces={capturedPieces.white} />
+      <CapturedStrip label="Black captured" pieces={capturedPieces.black} />
+    </div>
+  )
+}
+
+function MoveHistory({ moveLog }) {
+  const rows = []
+  for (let i = 0; i < moveLog.length; i += 2) {
+    rows.push({
+      number: i / 2 + 1,
+      white: moveLog[i],
+      black: moveLog[i + 1]
+    })
+  }
+
+  return (
+    <aside className="panel move-panel">
+      <h2>Moves</h2>
+      <div className="move-history">
+        {rows.length === 0 && <p className="muted">No moves yet</p>}
+        {rows.map((row) => (
+          <div className="move-row" key={row.number}>
+            <span className="move-number">{row.number}.</span>
+            <span className="move-white">{row.white}</span>
+            <span className="move-black">{row.black || ''}</span>
+          </div>
+        ))}
+      </div>
+    </aside>
+  )
+}
 
 export default function App() {
   const [board, setBoard] = useState(EMPTY_BOARD)
@@ -25,6 +87,8 @@ export default function App() {
   const [capturedPieces, setCapturedPieces] = useState({ white: [], black: [] })
   const [evalScore, setEvalScore] = useState(0)
   const [timeLimitMs, setTimeLimitMs] = useState(1000)
+  const [botLimitMode, setBotLimitMode] = useState('time')
+  const [depthLimit, setDepthLimit] = useState(3)
 
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [legalMoves, setLegalMoves] = useState([])
@@ -45,6 +109,8 @@ export default function App() {
     setCapturedPieces(data.captured_pieces)
     setEvalScore(data.eval)
     setTimeLimitMs(data.bot_time_limit_ms)
+    setBotLimitMode(data.bot_limit_mode || 'time')
+    setDepthLimit(data.bot_depth_limit || 3)
   }
 
   useEffect(() => {
@@ -153,7 +219,39 @@ export default function App() {
     setTimeLimitMs(newTimeLimitMs)
 
     try {
-      await apiSetTimeLimit(newTimeLimitMs)
+      await setBotLimit({
+        mode: botLimitMode,
+        milliseconds: newTimeLimitMs,
+        depth: depthLimit
+      })
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function onDepthLimitChange(newDepthLimit) {
+    setDepthLimit(newDepthLimit)
+
+    try {
+      await setBotLimit({
+        mode: botLimitMode,
+        milliseconds: timeLimitMs,
+        depth: newDepthLimit
+      })
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function onBotLimitModeChange(nextMode) {
+    setBotLimitMode(nextMode)
+
+    try {
+      await setBotLimit({
+        mode: nextMode,
+        milliseconds: timeLimitMs,
+        depth: depthLimit
+      })
     } catch (e) {
       setError(e.message)
     }
@@ -169,22 +267,30 @@ export default function App() {
         <p className="muted">Connecting to backend...</p>
       ) : (
         <div className="layout">
-          <div className="board-wrapper">
-            <Board
-              board={board}
-              selectedSquare={selectedSquare}
-              legalMoves={legalMoves}
-              lastMove={lastMove}
-              onSquareClick={onSquareClick}
-              disabled={thinking || gameOver || currentTurn !== playerColor}
-              playerColor={playerColor}
-            />
+          <div className="play-area">
+            <div className="board-column">
+              <CapturedShelf capturedPieces={capturedPieces} />
 
-            {thinking && (
-              <div className="thinking-overlay">
-                <div className="thinking-card">Engine thinking...</div>
+              <div className="board-wrapper">
+                <Board
+                  board={board}
+                  selectedSquare={selectedSquare}
+                  legalMoves={legalMoves}
+                  lastMove={lastMove}
+                  onSquareClick={onSquareClick}
+                  disabled={thinking || gameOver || currentTurn !== playerColor}
+                  playerColor={playerColor}
+                />
+
+                {thinking && (
+                  <div className="thinking-overlay">
+                    <div className="thinking-card">Engine thinking...</div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+
+            <MoveHistory moveLog={moveLog} />
           </div>
 
           <Sidebar
@@ -197,12 +303,14 @@ export default function App() {
             winner={winner}
             evalScore={evalScore}
             timeLimitMs={timeLimitMs}
+            botLimitMode={botLimitMode}
+            depthLimit={depthLimit}
             onTimeLimitChange={onTimeLimitChange}
+            onDepthLimitChange={onDepthLimitChange}
+            onBotLimitModeChange={onBotLimitModeChange}
             onNewGame={() => onNewGame(playerColor)}
             onUndo={onUndo}
             onPlayerColorChange={onPlayerColorChange}
-            moveLog={moveLog}
-            capturedPieces={capturedPieces}
           />
         </div>
       )}

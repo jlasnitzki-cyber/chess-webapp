@@ -1,7 +1,4 @@
 import moves_w
-import state_w
-
-
 def square_name(row, col):
     file_name = chr(ord("a") + col)
     rank_name = str(8 - row)
@@ -19,7 +16,7 @@ def piece_to_letter(piece):
     }[abs(piece)]
 
 
-def notation_disambiguation(board, piece, start_row, start_col, end_row, end_col):
+def notation_disambiguation(game, board, piece, start_row, start_col, end_row, end_col):
     piece_type = abs(piece)
     if piece_type in (1, 6):
         return ""
@@ -32,7 +29,13 @@ def notation_disambiguation(board, piece, start_row, start_col, end_row, end_col
             if row == start_row and col == start_col:
                 continue
             if board[row][col] == color_sign * piece_type:
-                if (end_row, end_col) in moves_w.get_legal_moves(board, row, col):
+                original_board = game.board
+                game.board = board
+                try:
+                    legal_moves = moves_w.get_legal_moves(game, row, col)
+                finally:
+                    game.board = original_board
+                if (end_row, end_col) in legal_moves:
                     conflicting_moves.append((row, col))
 
     if not conflicting_moves:
@@ -50,7 +53,7 @@ def notation_disambiguation(board, piece, start_row, start_col, end_row, end_col
     return chr(ord("a") + start_col)
 
 
-def move_to_notation(board_state_w, piece, start_row, start_col, end_row, end_col, captured_piece):
+def move_to_notation(game, board_state_w, piece, start_row, start_col, end_row, end_col, captured_piece):
     piece_type = abs(piece)
 
     if piece_type == 1 and abs(end_col - start_col) == 2:
@@ -66,7 +69,7 @@ def move_to_notation(board_state_w, piece, start_row, start_col, end_row, end_co
             notation = f"{prefix}x{destination}" if is_capture else destination
         else:
             letter = piece_to_letter(piece)
-            disambiguation = notation_disambiguation(board_state_w, piece, start_row, start_col, end_row, end_col)
+            disambiguation = notation_disambiguation(game, board_state_w, piece, start_row, start_col, end_row, end_col)
             notation = f"{letter}{disambiguation}{'x' if is_capture else ''}{destination}"
 
     if piece_type == 6 and end_row in (0, 7):
@@ -75,13 +78,17 @@ def move_to_notation(board_state_w, piece, start_row, start_col, end_row, end_co
     return notation
 
 
-def build_move_log_lines():
+def build_move_log_lines(game):
     lines = []
 
-    for index in range(0, len(state_w.move_notation_history), 2):
+    for index in range(0, len(game.move_notation_history), 2):
         move_number = index // 2 + 1
-        white_move = state_w.move_notation_history[index]
-        black_move = state_w.move_notation_history[index + 1] if index + 1 < len(state_w.move_notation_history) else None
+        white_move = game.move_notation_history[index]
+        black_move = (
+            game.move_notation_history[index + 1]
+            if index + 1 < len(game.move_notation_history)
+            else None
+        )
 
         if black_move is None:
             lines.append(f"{move_number}. {white_move}")
