@@ -56,6 +56,7 @@ export default function Board({
               disabled={disabled}
               aria-label={`Square ${row},${col}${glyph ? `, ${color} piece` : ', empty'}`}
             >
+              {isLastMove && <span className="last-move-highlight" aria-hidden="true" />}
               {isLegalTarget && !glyph && <span className="move-dot" />}
               {isLegalTarget && glyph && <span className="capture-ring" />}
               {glyph && <span className={`piece piece-${color}`}>{glyph}</span>}
