@@ -28,6 +28,9 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://chess-webapp-alpha.vercel.app",
+        "https://lasnitzkichess.com",
+        "https://www.lasnitzkichess.com",
+        
     ],
     allow_methods=["*"],
     allow_headers=["*"],
